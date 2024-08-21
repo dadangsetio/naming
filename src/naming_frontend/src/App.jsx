@@ -1,39 +1,48 @@
 import { useState, useEffect } from 'react';
-
-const backendUrl = 'https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=oq35z-viaaa-aaaal-qjqkq-cai';
+import { naming_backend } from 'declarations/naming_backend';
 
 function App() {
-  const [greeting, setGreeting] = useState('');
   const [nameCount, setNameCount] = useState(null);
   const [totalSubmissions, setTotalSubmissions] = useState(0);
+  const [allNames, setAllNames] = useState([]);
+  const [icpUsdExchange, setIcpUsdExchange] = useState('');
 
   useEffect(() => {
     updateTotalSubmissions();
+    updateAllNames();
+    updateIcpUsdExchange();
   }, []);
 
-  async function updateTotalSubmissions() {
+  function updateTotalSubmissions() {
+    naming_backend.getTotalSubmissions().then(setTotalSubmissions);
+  }
+
+  async function updateIcpUsdExchange() {
     try {
-      const response = await fetch(`${backendUrl}getTotalSubmissions`);
-      const total = await response.json();
-      setTotalSubmissions(total);
+      const exchangeData = await naming_backend.get_icp_usd_exchange();
+      setIcpUsdExchange(exchangeData);
     } catch (error) {
-      console.error('Error fetching total submissions:', error);
+      console.error('Error fetching ICP-USD exchange rate:', error);
+      setIcpUsdExchange('Error fetching exchange rate');
     }
+  }
+
+  function updateAllNames() {
+    naming_backend.getAllNames().then(setAllNames);
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
     const name = event.target.elements.name.value;
+    
     try {
-      const greetResponse = await fetch(`${backendUrl}greet?name=${encodeURIComponent(name)}`);
-      const greetText = await greetResponse.text();
-      setGreeting(greetText);
+      const count = await naming_backend.submitName(name);
+      setNameCount(Number(count));
 
-      const rankResponse = await fetch(`${backendUrl}getNameRank?name=${encodeURIComponent(name)}`);
-      const count = await rankResponse.json();
-      setNameCount(count);
-      
-      updateTotalSubmissions();
+      await updateTotalSubmissions();
+      await updateAllNames();
+
+      event.target.elements.name.value = '';
     } catch (error) {
       console.error('Error submitting name:', error);
     }
@@ -41,7 +50,6 @@ function App() {
 
   return (
     <main>
-      <img src="/logo2.svg" alt="DFINITY Logo" />
       <h1>Name Counter</h1>
       <form onSubmit={handleSubmit}>
         <div>
@@ -50,15 +58,27 @@ function App() {
         </div>
         <button type="submit">Submit</button>
       </form>
-      {greeting && <section id="greeting">{greeting}</section>}
       {nameCount !== null && (
         <section id="nameCount">
           <h2>Name Statistics:</h2>
-          <p>Your name has been submitted {nameCount} time(s)</p>
+          <p>Your name has been submitted {Number(nameCount)} times</p>
         </section>
       )}
       <section id="totalSubmissions">
-        <p>Total name submissions: {totalSubmissions}</p>
+        <p>Total name submissions: {Number(totalSubmissions)}</p>
+      </section>
+      <section id="allNames">
+        <h2>List of All Names:</h2>
+        <ul>
+          {allNames.map(([name, count]) => (
+            <li key={name}>{name}: {Number(count)} times</li>
+          ))}
+        </ul>
+      </section>
+      <section id="icpUsdExchange">
+        <h2>ICP-USD Exchange Rate:</h2>
+        <p>{icpUsdExchange}</p>
+        <button onClick={updateIcpUsdExchange}>Refresh Exchange Rate</button>
       </section>
     </main>
   );
